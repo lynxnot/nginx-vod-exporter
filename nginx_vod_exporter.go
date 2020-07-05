@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
@@ -116,7 +117,8 @@ var (
 // Exporter collects Kaltura VOD stats from the given URI and exports them
 // in prometheus metrics format.
 type Exporter struct {
-	URI string
+	URI   string
+	mutex sync.RWMutex
 
 	infoMetric   *prometheus.Desc
 	cacheMetrics metrics
@@ -150,6 +152,8 @@ func mustNewConstMetric(mi metricInfo, value uint64, labelValues ...string) prom
 // Collect fetches stats from upstream and delivers them as metrics
 // Implents prometheus.Collector
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
+	e.mutex.Lock() // Protect metrics from concurrent collects
+	defer e.mutex.Unlock()
 
 	vodStatus, err := fetchAndUnmarshal(e.URI)
 	if err != nil {
