@@ -75,13 +75,51 @@ type VodStatus struct {
 	MappingCache        CacheCounters       `xml:"mapping_cache"`
 	PerformanceCounters PerformanceCounters `xml:"performance_counters"`
 }
+
+// keeps Desc and Types togheter
+type metricInfo struct {
+	Desc *prometheus.Desc
+	Type prometheus.ValueType
 }
+
+func newCacheMetric(metricName string, docString string, t prometheus.ValueType, constLabels prometheus.Labels) metricInfo {
+	return metricInfo{
+		Desc: prometheus.NewDesc(
+			prometheus.BuildFQName(*metricsNamespace, "cache", metricName),
+			docString,
+			[]string{"buffer"}, // metadata or mapping
+			constLabels,
+		),
+		Type: t,
+	}
+}
+
+type metrics map[string]metricInfo
+
+var (
+	cacheMetrics = metrics{
+		"store_ok":      newCacheMetric("store_total", "Total store ops", prometheus.CounterValue, prometheus.Labels{"result": "ok"}),
+		"store_err":     newCacheMetric("store_total", "Total store ops", prometheus.CounterValue, prometheus.Labels{"result": "err"}),
+		"store_exists":  newCacheMetric("store_total", "Total store ops", prometheus.CounterValue, prometheus.Labels{"result": "exists"}),
+		"store_bytes":   newCacheMetric("store_bytes", "Total bytes stored", prometheus.CounterValue, nil),
+		"fetch_hit":     newCacheMetric("fetch_total", "Total fetches", prometheus.CounterValue, prometheus.Labels{"result": "hit"}),
+		"fetch_miss":    newCacheMetric("fetch_total", "Total fetches", prometheus.CounterValue, prometheus.Labels{"result": "miss"}),
+		"fetch_bytes":   newCacheMetric("fetch_bytes", "Total bytes fetched", prometheus.CounterValue, nil),
+		"evicted":       newCacheMetric("evicted_total", "Total evictions", prometheus.CounterValue, nil),
+		"evicted_bytes": newCacheMetric("evicted_bytes", "Total bytes evicted", prometheus.CounterValue, nil),
+		"reset":         newCacheMetric("reset_total", "Total numbers of counter resets", prometheus.CounterValue, nil),
+		"entries":       newCacheMetric("entries", "Current number of entries", prometheus.GaugeValue, nil),
+		"data_size":     newCacheMetric("used_bytes", "Current bytes in cache", prometheus.GaugeValue, nil),
+	}
+)
 
 // Exporter collects Kaltura VOD stats from the given URI and exports them
 // in prometheus metrics format.
 type Exporter struct {
-	URI        string
-	infoMetric *prometheus.Desc
+	URI string
+
+	infoMetric   *prometheus.Desc
+	cacheMetrics metrics
 }
 
 // NewExporter returns an initialized exporter
@@ -89,14 +127,24 @@ func NewExporter(uri string) *Exporter {
 	return &Exporter{
 		URI: uri,
 		infoMetric: prometheus.NewDesc(
-			prometheus.BuildFQName(*metricsNamespace, "info", "version"),
+			prometheus.BuildFQName(*metricsNamespace, "module", "info"),
 			"kaltura/nginx-vod-module info", []string{"version"}, nil),
+
+		cacheMetrics: cacheMetrics,
 	}
 }
 
 // Describe describes all metrics exported, implements prometheus.Collector
 func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	ch <- e.infoMetric
+
+	for _, m := range e.cacheMetrics {
+		ch <- m.Desc
+	}
+}
+
+func mustNewConstMetric(mi metricInfo, value uint64, labelValues ...string) prometheus.Metric {
+	return prometheus.MustNewConstMetric(mi.Desc, mi.Type, float64(value), labelValues...)
 }
 
 // Collect fetches stats from upstream and delivers them as metrics
@@ -109,7 +157,35 @@ func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 		return
 	}
 
-	// infoMatric uses labels to expose data, the GaugeValue is constant
+	// MetadataCache
+	ch <- mustNewConstMetric(e.cacheMetrics["store_ok"], vodStatus.MetadataCache.StoreOK, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_err"], vodStatus.MetadataCache.StoreErr, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_exists"], vodStatus.MetadataCache.StoreExists, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_bytes"], vodStatus.MetadataCache.StoreBytes, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_hit"], vodStatus.MetadataCache.FetchHit, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_miss"], vodStatus.MetadataCache.FetchMiss, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_bytes"], vodStatus.MetadataCache.FetchBytes, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["evicted"], vodStatus.MetadataCache.Evicted, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["evicted_bytes"], vodStatus.MetadataCache.EvictedBytes, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["reset"], vodStatus.MetadataCache.Reset, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["entries"], vodStatus.MetadataCache.Entries, "metadata")
+	ch <- mustNewConstMetric(e.cacheMetrics["data_size"], vodStatus.MetadataCache.DataSize, "metadata")
+
+	// MappingCache
+	ch <- mustNewConstMetric(e.cacheMetrics["store_ok"], vodStatus.MappingCache.StoreOK, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_err"], vodStatus.MappingCache.StoreErr, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_exists"], vodStatus.MappingCache.StoreExists, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["store_bytes"], vodStatus.MappingCache.StoreBytes, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_hit"], vodStatus.MappingCache.FetchHit, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_miss"], vodStatus.MappingCache.FetchMiss, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["fetch_bytes"], vodStatus.MappingCache.FetchBytes, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["evicted"], vodStatus.MappingCache.Evicted, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["evicted_bytes"], vodStatus.MappingCache.EvictedBytes, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["reset"], vodStatus.MappingCache.Reset, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["entries"], vodStatus.MappingCache.Entries, "mapping")
+	ch <- mustNewConstMetric(e.cacheMetrics["data_size"], vodStatus.MappingCache.DataSize, "mapping")
+
+	// infoMetric uses labels to expose data, the GaugeValue is constant
 	ch <- prometheus.MustNewConstMetric(e.infoMetric, prometheus.GaugeValue, float64(1), vodStatus.Version)
 }
 
