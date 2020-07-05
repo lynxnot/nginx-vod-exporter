@@ -8,6 +8,12 @@ A [prometheus][1] exporter for Kaltura [nginx-vod-module][2].
 - This project was the perfect opportunity for me to learn Go, Prometheus and [devspace.sh][5].
 - WIP!
 
+## TODO
+
+- implement performance_counters _à la prometheus_
+- understand promu & version stuff
+- write some tests
+- dockerize
 
 
 
