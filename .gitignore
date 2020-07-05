@@ -11,7 +11,8 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
-# Dependency directories
+# Dependency directories, ignore for the moment
+# https://github.com/golang/dep/blob/master/docs/FAQ.md#should-i-commit-my-vendor-directory
 vendor/
 
 # IDE's
