@@ -24,40 +24,57 @@ const (
 	defaultNameSpace string = "nginx_vod"
 )
 
-// MetadataCache  metadata_cache
-type MetadataCache struct {
-	XMLName      xml.Name `xml:"metadata_cache"`
-	StoreOK      uint64   `xml:"store_ok"`
-	StoreBytes   uint64   `xml:"store_bytes"`
-	StoreErr     uint64   `xml:"store_err"`
-	StoreExists  uint64   `xml:"store_exists"`
-	FetchHit     uint64   `xml:"fetch_hit"`
-	FetchBytes   uint64   `xml:"fetch_bytes"`
-	FetchMiss    uint64   `xml:"fetch_miss"`
-	Evicted      uint64   `xml:"evicted"`
-	EvictedBytes uint64   `xml:"evicted_bytes"`
-	Reset        uint64   `xml:"reset"`
-	Entries      uint64   `xml:"entries"`
-	DataSize     uint64   `xml:"data_size"`
+// CacheCounters represent
+type CacheCounters struct {
+	StoreOK      uint64 `xml:"store_ok"`
+	StoreBytes   uint64 `xml:"store_bytes"`
+	StoreErr     uint64 `xml:"store_err"`
+	StoreExists  uint64 `xml:"store_exists"`
+	FetchHit     uint64 `xml:"fetch_hit"`
+	FetchBytes   uint64 `xml:"fetch_bytes"`
+	FetchMiss    uint64 `xml:"fetch_miss"`
+	Evicted      uint64 `xml:"evicted"`
+	EvictedBytes uint64 `xml:"evicted_bytes"`
+	Reset        uint64 `xml:"reset"`
+	Entries      uint64 `xml:"entries"`
+	DataSize     uint64 `xml:"data_size"`
 }
 
-// MappingCache  mapping_cache
-type MappingCache struct {
-	XMLName xml.Name `xml:"mapping_cache"`
+// OpCounter represent a perfomance counter
+type OpCounter struct {
+	Sum     uint64 `xml:"sum"`
+	Count   uint64 `xml:"count"`
+	Max     uint64 `xml:"max"`
+	MaxTime uint64 `xml:"max_time"`
+	MaxPid  uint64 `xml:"max_pid"`
 }
 
 // PerformanceCounters  performance_counters
 type PerformanceCounters struct {
-	XMLName xml.Name `xml:"performance_counters"`
+	FetchCache          OpCounter `xml:"fetch_cache"`
+	StoreCache          OpCounter `xml:"store_cache"`
+	MapPath             OpCounter `xml:"map_path"`
+	ParseMediaSet       OpCounter `xml:"parse_media_set"`
+	GetDrmInfo          OpCounter `xml:"get_drm_info"`
+	OpenFile            OpCounter `xml:"open_file"`
+	AsyncOpenFile       OpCounter `xml:"async_open_file"`
+	ReadFile            OpCounter `xml:"read_file"`
+	AsyncReadFile       OpCounter `xml:"async_read_file"`
+	MediaParse          OpCounter `xml:"media_parse"`
+	BuildManifest       OpCounter `xml:"build_manifest"`
+	InitFrameProcessing OpCounter `xml:"init_frame_processing"`
+	ProcessFrames       OpCounter `xml:"process_frames"`
+	Total               OpCounter `xml:"total"`
 }
 
 // VodStatus  represent the vod-status xml
 type VodStatus struct {
-	XMLName       xml.Name `xml:"vod"`
-	Version       string   `xml:"version"`
-	MetadataCache MetadataCache
-	//MappingCache MappingCache
-	//PerformanceCounters PerformanceCounters
+	XMLName             xml.Name            `xml:"vod"`
+	Version             string              `xml:"version"`
+	MetadataCache       CacheCounters       `xml:"metadata_cache"`
+	MappingCache        CacheCounters       `xml:"mapping_cache"`
+	PerformanceCounters PerformanceCounters `xml:"performance_counters"`
+}
 }
 
 // Exporter collects Kaltura VOD stats from the given URI and exports them
