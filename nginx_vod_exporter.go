@@ -163,7 +163,7 @@ func fetchHTTP(uri string, sslVerify bool, timeout time.Duration) func() (io.Rea
 var (
 	listenAddress    = flag.String("exporter.address", ":19101", "Exporter listen address")
 	metricsEndpoint  = flag.String("metrics.endpoint", "/metrics", "Path under which to expose metrics")
-	metricsNamespace = flag.String("metrics.namespace", "nginx_vod", "Prometheus metrics namespace")
+	metricsNamespace = flag.String("metrics.namespace", defaultNameSpace, "Prometheus metrics namespace")
 	metricsGo        = flag.Bool("metrics.process", true, "Export process and go metrics.")
 	vodStatusURI     = flag.String("status.uri", "http://localhost/vod-status", "URI to nginx-vod status page")
 	vodStatusTimeout = flag.Int("status.timeout", 2, "Seconds to wait for a response from vod-status")
