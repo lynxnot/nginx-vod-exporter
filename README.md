@@ -11,8 +11,8 @@ A [prometheus][1] exporter for Kaltura [nginx-vod-module][2].
 
 
 
-[1](https://github.com/prometheus/prometheus)
-[2](https://github.com/kaltura/nginx-vod-module)
-[3](https://github.com/hnlq715/nginx-vts-exporter)
-[4](https://github.com/prometheus/haproxy_exporter)
-[5](https://devspace.sh)
+[1]: https://github.com/prometheus/prometheus
+[2]: https://github.com/kaltura/nginx-vod-module
+[3]: https://github.com/hnlq715/nginx-vts-exporter
+[4]: https://github.com/prometheus/haproxy_exporter
+[5]: https://devspace.sh
