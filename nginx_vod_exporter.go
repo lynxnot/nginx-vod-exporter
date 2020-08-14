@@ -10,6 +10,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -402,14 +403,43 @@ func fetchHTTP(uri string, sslVerify bool, timeout time.Duration) func() (io.Rea
 	}
 }
 
+func lookupEnvOrString(envVar string, defaultValue string) string {
+	if v, ok := os.LookupEnv(envVar); ok {
+		return v
+	}
+	return defaultValue
+}
+
+func lookupEnvOrBool(envVar string, defaultValue bool) bool {
+	if v, ok := os.LookupEnv(envVar); ok {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			log.Fatalf("lookupEnvOrBool(%s): %v", envVar, err)
+		}
+		return b
+	}
+	return defaultValue
+}
+
+func lookupEnvOrInt(envVar string, defaultValue int) int {
+	if v, ok := os.LookupEnv(envVar); ok {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			log.Fatalf("lookupEnvOrInt(%s): %v", envVar, err)
+		}
+		return i
+	}
+	return defaultValue
+}
+
 var (
-	listenAddress    = flag.String("exporter.address", ":19101", "Exporter listen address")
-	metricsEndpoint  = flag.String("metrics.endpoint", "/metrics", "Path under which to expose metrics")
-	metricsNamespace = flag.String("metrics.namespace", defaultNameSpace, "Prometheus metrics namespace")
-	metricsGo        = flag.Bool("metrics.process", true, "Export process and go metrics.")
-	vodStatusURI     = flag.String("status.uri", "http://localhost/vod-status", "URI to nginx-vod status page")
-	vodStatusTimeout = flag.Int("status.timeout", 2, "Seconds to wait for a response from vod-status")
-	insecureSSL      = flag.Bool("tls.insecure", true, "Do not verify SSL certificates")
+	listenAddress    = flag.String("exporter.address", lookupEnvOrString("VOD_EXPORTER_LISTEN_ADDRESS", ":19101"), "Exporter listen address")
+	metricsEndpoint  = flag.String("metrics.endpoint", lookupEnvOrString("VOD_EXPORTER_METRICS_ENDPOINT", "/metrics"), "Path under which to expose metrics")
+	metricsNamespace = flag.String("metrics.namespace", lookupEnvOrString("VOD_EXPORTER_METRICS_NAMESPACE", defaultNameSpace), "Prometheus metrics namespace")
+	metricsGo        = flag.Bool("metrics.process", lookupEnvOrBool("VOD_EXPORTER_METRICS_GO", true), "Export process and go metrics.")
+	vodStatusURI     = flag.String("status.uri", lookupEnvOrString("VOD_EXPORTER_STATUS_URI", "http://localhost/vod-status"), "URI to nginx-vod status page")
+	vodStatusTimeout = flag.Int("status.timeout", lookupEnvOrInt("VOD_EXPORTER_STATUS_TIMEOUT", 2), "Seconds to wait for a response from vod-status")
+	insecureSSL      = flag.Bool("tls.insecure", lookupEnvOrBool("VOD_EXPORTER_TLS_INSECURE", true), "Do not verify SSL certificates")
 	showVersion      = flag.Bool("version", false, "Show version and exit")
 )
 
