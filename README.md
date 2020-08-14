@@ -10,7 +10,6 @@ A [prometheus][1] exporter for Kaltura [nginx-vod-module][2].
 
 ## TODO
 
-- implement performance_counters _à la prometheus_
 - understand promu & version stuff
 - write some tests
 - dockerize

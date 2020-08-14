@@ -95,6 +95,18 @@ func newCacheMetric(metricName string, docString string, t prometheus.ValueType,
 	}
 }
 
+func newPerfMetric(metricName string, docString string, t prometheus.ValueType, constLabels prometheus.Labels) metricInfo {
+	return metricInfo{
+		Desc: prometheus.NewDesc(
+			prometheus.BuildFQName(*metricsNamespace, "perf", metricName),
+			docString,
+			[]string{"operation"}, // metadata or mapping
+			constLabels,
+		),
+		Type: t,
+	}
+}
+
 type metrics map[string]metricInfo
 
 var (
@@ -112,6 +124,14 @@ var (
 		"entries":       newCacheMetric("entries", "Current number of entries", prometheus.GaugeValue, nil),
 		"data_size":     newCacheMetric("used_bytes", "Current bytes in cache", prometheus.GaugeValue, nil),
 	}
+
+	perfMetrics = metrics{
+		"time_msec":         newPerfMetric("time_msec", "Total op time", prometheus.CounterValue, nil),
+		"total":             newPerfMetric("total", "Total ops", prometheus.CounterValue, nil),
+		"maxtime_msec":      newPerfMetric("maxtime_msec", "Max op time", prometheus.CounterValue, nil),
+		"maxtime_timestamp": newPerfMetric("maxtime_timestamp", "Max op time timestamp", prometheus.CounterValue, nil),
+		"maxtime_pid":       newPerfMetric("maxtime_pid", "Max op time PID", prometheus.CounterValue, nil),
+	}
 )
 
 // Exporter collects Kaltura VOD stats from the given URI and exports them
@@ -122,6 +142,7 @@ type Exporter struct {
 
 	infoMetric   *prometheus.Desc
 	cacheMetrics metrics
+	perfMetrics  metrics
 }
 
 // NewExporter returns an initialized exporter
@@ -133,6 +154,7 @@ func NewExporter(uri string) *Exporter {
 			"kaltura/nginx-vod-module info", []string{"version"}, nil),
 
 		cacheMetrics: cacheMetrics,
+		perfMetrics:  perfMetrics,
 	}
 }
 
@@ -149,48 +171,188 @@ func mustNewConstMetric(mi metricInfo, value uint64, labelValues ...string) prom
 	return prometheus.MustNewConstMetric(mi.Desc, mi.Type, float64(value), labelValues...)
 }
 
+type (
+	metricValues map[string]map[string]uint64
+
+	vodStatusValues struct {
+		version     string
+		cacheValues metricValues
+		perfValues  metricValues
+	}
+)
+
+func fetchStatusValues(uri string) (*vodStatusValues, error) {
+
+	vodStatus, err := fetchAndUnmarshal(uri)
+	if err != nil {
+		return nil, err
+	}
+	values := &vodStatusValues{
+		version: vodStatus.Version,
+		cacheValues: metricValues{
+			"metadata": {
+				"store_ok":      vodStatus.MetadataCache.StoreOK,
+				"store_err":     vodStatus.MetadataCache.StoreErr,
+				"store_exists":  vodStatus.MetadataCache.StoreExists,
+				"store_bytes":   vodStatus.MetadataCache.StoreBytes,
+				"fetch_hit":     vodStatus.MetadataCache.FetchHit,
+				"fetch_miss":    vodStatus.MetadataCache.FetchMiss,
+				"fetch_bytes":   vodStatus.MetadataCache.FetchBytes,
+				"evicted":       vodStatus.MetadataCache.Evicted,
+				"evicted_bytes": vodStatus.MetadataCache.EvictedBytes,
+				"reset":         vodStatus.MetadataCache.Reset,
+				"entries":       vodStatus.MetadataCache.Entries,
+				"data_size":     vodStatus.MetadataCache.DataSize,
+			},
+			"mapping": {
+				"store_ok":      vodStatus.MappingCache.StoreOK,
+				"store_err":     vodStatus.MappingCache.StoreErr,
+				"store_exists":  vodStatus.MappingCache.StoreExists,
+				"store_bytes":   vodStatus.MappingCache.StoreBytes,
+				"fetch_hit":     vodStatus.MappingCache.FetchHit,
+				"fetch_miss":    vodStatus.MappingCache.FetchMiss,
+				"fetch_bytes":   vodStatus.MappingCache.FetchBytes,
+				"evicted":       vodStatus.MappingCache.Evicted,
+				"evicted_bytes": vodStatus.MappingCache.EvictedBytes,
+				"reset":         vodStatus.MappingCache.Reset,
+				"entries":       vodStatus.MappingCache.Entries,
+				"data_size":     vodStatus.MappingCache.DataSize,
+			},
+		},
+		perfValues: metricValues{
+			"fetch_cache": {
+				"time_msec":         vodStatus.PerformanceCounters.FetchCache.Sum,
+				"total":             vodStatus.PerformanceCounters.FetchCache.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.FetchCache.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.FetchCache.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.FetchCache.MaxPid,
+			},
+			"store_cache": {
+				"time_msec":         vodStatus.PerformanceCounters.StoreCache.Sum,
+				"total":             vodStatus.PerformanceCounters.StoreCache.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.StoreCache.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.StoreCache.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.StoreCache.MaxPid,
+			},
+			"map_path": {
+				"time_msec":         vodStatus.PerformanceCounters.MapPath.Sum,
+				"total":             vodStatus.PerformanceCounters.MapPath.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.MapPath.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.MapPath.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.MapPath.MaxPid,
+			},
+			"parse_media_set": {
+				"time_msec":         vodStatus.PerformanceCounters.ParseMediaSet.Sum,
+				"total":             vodStatus.PerformanceCounters.ParseMediaSet.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.ParseMediaSet.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.ParseMediaSet.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.ParseMediaSet.MaxPid,
+			},
+			"get_drm_info": {
+				"time_msec":         vodStatus.PerformanceCounters.GetDrmInfo.Sum,
+				"total":             vodStatus.PerformanceCounters.GetDrmInfo.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.GetDrmInfo.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.GetDrmInfo.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.GetDrmInfo.MaxPid,
+			},
+			"open_file": {
+				"time_msec":         vodStatus.PerformanceCounters.OpenFile.Sum,
+				"total":             vodStatus.PerformanceCounters.OpenFile.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.OpenFile.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.OpenFile.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.OpenFile.MaxPid,
+			},
+			"async_open_file": {
+				"time_msec":         vodStatus.PerformanceCounters.AsyncOpenFile.Sum,
+				"total":             vodStatus.PerformanceCounters.AsyncOpenFile.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.AsyncOpenFile.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.AsyncOpenFile.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.AsyncOpenFile.MaxPid,
+			},
+			"read_file": {
+				"time_msec":         vodStatus.PerformanceCounters.ReadFile.Sum,
+				"total":             vodStatus.PerformanceCounters.ReadFile.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.ReadFile.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.ReadFile.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.ReadFile.MaxPid,
+			},
+			"async_read_file": {
+				"time_msec":         vodStatus.PerformanceCounters.AsyncReadFile.Sum,
+				"total":             vodStatus.PerformanceCounters.AsyncReadFile.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.AsyncReadFile.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.AsyncReadFile.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.AsyncReadFile.MaxPid,
+			},
+			"media_parse": {
+				"time_msec":         vodStatus.PerformanceCounters.MediaParse.Sum,
+				"total":             vodStatus.PerformanceCounters.MediaParse.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.MediaParse.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.MediaParse.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.MediaParse.MaxPid,
+			},
+			"build_manifest": {
+				"time_msec":         vodStatus.PerformanceCounters.BuildManifest.Sum,
+				"total":             vodStatus.PerformanceCounters.BuildManifest.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.BuildManifest.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.BuildManifest.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.BuildManifest.MaxPid,
+			},
+			"init_frame_processing": {
+				"time_msec":         vodStatus.PerformanceCounters.InitFrameProcessing.Sum,
+				"total":             vodStatus.PerformanceCounters.InitFrameProcessing.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.InitFrameProcessing.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.InitFrameProcessing.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.InitFrameProcessing.MaxPid,
+			},
+			"process_frames": {
+				"time_msec":         vodStatus.PerformanceCounters.ProcessFrames.Sum,
+				"total":             vodStatus.PerformanceCounters.ProcessFrames.Count,
+				"maxtime_msec":      vodStatus.PerformanceCounters.ProcessFrames.Max,
+				"maxtime_timestamp": vodStatus.PerformanceCounters.ProcessFrames.MaxTime,
+				"maxtime_pid":       vodStatus.PerformanceCounters.ProcessFrames.MaxPid,
+			},
+			// Total should be the sum of every op ?
+			//"total": {
+			//	"time_msec":         vodStatus.PerformanceCounters.Total.Sum,
+			//	"total":             vodStatus.PerformanceCounters.Total.Count,
+			//	"maxtime_msec":      vodStatus.PerformanceCounters.Total.Max,
+			//	"maxtime_timestamp": vodStatus.PerformanceCounters.Total.MaxTime,
+			//	"maxtime_pid":       vodStatus.PerformanceCounters.Total.MaxPid,
+			//},
+		},
+	}
+
+	return values, nil
+}
+
 // Collect fetches stats from upstream and delivers them as metrics
 // Implents prometheus.Collector
 func (e *Exporter) Collect(ch chan<- prometheus.Metric) {
 	e.mutex.Lock() // Protect metrics from concurrent collects
 	defer e.mutex.Unlock()
 
-	vodStatus, err := fetchAndUnmarshal(e.URI)
+	statusValues, err := fetchStatusValues(e.URI)
 	if err != nil {
 		// errors are logged in fetchAndUnmarshal
 		return
 	}
 
-	// MetadataCache
-	ch <- mustNewConstMetric(e.cacheMetrics["store_ok"], vodStatus.MetadataCache.StoreOK, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_err"], vodStatus.MetadataCache.StoreErr, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_exists"], vodStatus.MetadataCache.StoreExists, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_bytes"], vodStatus.MetadataCache.StoreBytes, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_hit"], vodStatus.MetadataCache.FetchHit, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_miss"], vodStatus.MetadataCache.FetchMiss, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_bytes"], vodStatus.MetadataCache.FetchBytes, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["evicted"], vodStatus.MetadataCache.Evicted, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["evicted_bytes"], vodStatus.MetadataCache.EvictedBytes, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["reset"], vodStatus.MetadataCache.Reset, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["entries"], vodStatus.MetadataCache.Entries, "metadata")
-	ch <- mustNewConstMetric(e.cacheMetrics["data_size"], vodStatus.MetadataCache.DataSize, "metadata")
+	// Cache Metrics
+	for region, values := range statusValues.cacheValues {
+		for name, metric := range e.cacheMetrics {
+			ch <- mustNewConstMetric(metric, values[name], region)
+		}
+	}
 
-	// MappingCache
-	ch <- mustNewConstMetric(e.cacheMetrics["store_ok"], vodStatus.MappingCache.StoreOK, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_err"], vodStatus.MappingCache.StoreErr, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_exists"], vodStatus.MappingCache.StoreExists, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["store_bytes"], vodStatus.MappingCache.StoreBytes, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_hit"], vodStatus.MappingCache.FetchHit, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_miss"], vodStatus.MappingCache.FetchMiss, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["fetch_bytes"], vodStatus.MappingCache.FetchBytes, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["evicted"], vodStatus.MappingCache.Evicted, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["evicted_bytes"], vodStatus.MappingCache.EvictedBytes, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["reset"], vodStatus.MappingCache.Reset, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["entries"], vodStatus.MappingCache.Entries, "mapping")
-	ch <- mustNewConstMetric(e.cacheMetrics["data_size"], vodStatus.MappingCache.DataSize, "mapping")
+	// Perf Metrics
+	for op, values := range statusValues.perfValues {
+		for name, metric := range e.perfMetrics {
+			ch <- mustNewConstMetric(metric, values[name], op)
+		}
+	}
 
 	// infoMetric uses labels to expose data, the GaugeValue is constant
-	ch <- prometheus.MustNewConstMetric(e.infoMetric, prometheus.GaugeValue, float64(1), vodStatus.Version)
+	ch <- prometheus.MustNewConstMetric(e.infoMetric, prometheus.GaugeValue, float64(1), statusValues.version)
 }
 
 // fetch and parse xml response
