@@ -1,0 +1,47 @@
+version: v1beta9
+images:
+  app:
+    image: lynxnot/nginx-vod-exporter
+    preferSyncOverRebuild: true
+    injectRestartHelper: true
+    appendDockerfileInstructions:
+    - USER root
+    build:
+      docker:
+        options:
+          target: build
+deployments:
+- name: nginx-vod-exporter
+  helm:
+    componentChart: true
+    values:
+      containers:
+      - image: lynxnot/nginx-vod-exporter
+      service:
+        ports:
+        - port: 8080
+dev:
+  ports:
+  - imageName: app
+    forward:
+    - port: 8080
+  open:
+  - url: http://localhost:8080
+  sync:
+  - imageName: app
+    excludePaths:
+    - .git/
+    uploadExcludePaths:
+    - Dockerfile
+    - devspace.yaml
+    onUpload:
+      restartContainer: true
+profiles:
+- name: production
+  patches:
+  - op: remove
+    path: images.app.injectRestartHelper
+  - op: remove
+    path: images.app.appendDockerfileInstructions
+  - op: remove
+    path: images.app.build.docker.options.target

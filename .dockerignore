@@ -1,0 +1,11 @@
+Dockerfile
+.git/
+.gitignore
+.vscode/
+vendor/
+go.sum
+
+devspace.yaml
+LICENSE
+README.md
+vod-status-pretty.xml

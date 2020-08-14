@@ -17,3 +17,6 @@ vendor/
 
 # IDE's
 .vscode/
+
+# Ignore DevSpace cache and log folder
+.devspace/
