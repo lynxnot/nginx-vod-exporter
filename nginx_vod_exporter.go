@@ -166,6 +166,10 @@ func (e *Exporter) Describe(ch chan<- *prometheus.Desc) {
 	for _, m := range e.cacheMetrics {
 		ch <- m.Desc
 	}
+
+	for _, m := range e.perfMetrics {
+		ch <- m.Desc
+	}
 }
 
 func mustNewConstMetric(mi metricInfo, value uint64, labelValues ...string) prometheus.Metric {
