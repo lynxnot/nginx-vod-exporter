@@ -21,7 +21,7 @@ import (
 const (
 	progName string = "nginx-vod-exporter"
 	// use a const for now...
-	progVersion string = "0.1.0"
+	progVersion string = "0.1.1"
 	// defaultNameSpace for prometheus metrics
 	defaultNameSpace string = "nginx_vod"
 )
