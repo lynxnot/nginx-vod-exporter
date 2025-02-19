@@ -4,6 +4,9 @@
 # - as target for development (see devspace.yaml)
 FROM golang:1.15.5-alpine as build
 
+ARG TARGETPLATFORM
+ARG BUILDPLATFORM
+
 # Create project directory (workdir)
 WORKDIR /app
 
@@ -11,7 +14,7 @@ WORKDIR /app
 ADD . .
 
 # Build application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o nginx_vod_exporter .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETPLATFORM#linux/} go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o nginx_vod_exporter .
 
 # Container start command for development
 # Allows DevSpace to restart the dev container
