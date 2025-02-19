@@ -45,6 +45,15 @@ These variables are overriding the default options.
 Arguments specified on the command line will supersede defaults.
 
 
+## Build
+
+The build supports multi-arch builds using [docker buildx][6].
+
+```
+$ docker buildx build --push --platform linux/amd64,linux/arm64 -t lynxnot/nginx-vod-exporter:<TAG> .
+```
+
+
 ## TODO
 
 - add grafana dashboard
@@ -57,3 +66,4 @@ Arguments specified on the command line will supersede defaults.
 [3]: https://github.com/hnlq715/nginx-vts-exporter
 [4]: https://github.com/prometheus/haproxy_exporter
 [5]: https://devspace.sh
+[6]: https://docs.docker.com/build/building/multi-platform/
